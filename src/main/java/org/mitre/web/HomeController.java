@@ -34,6 +34,19 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
+
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+import io.opencensus.common.Scope;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceConfiguration;
+import io.opencensus.exporter.trace.stackdriver.StackdriverTraceExporter;
+import io.opencensus.trace.Tracer;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
+import java.io.IOException;
+import java.util.Date;
+import org.joda.time.DateTime;
+
 /**
  * Handles requests for the application home page.
  */
@@ -41,6 +54,11 @@ import org.springframework.web.bind.annotation.RequestMethod;
 public class HomeController {
 
 	private static final Logger logger = LoggerFactory.getLogger(HomeController.class);
+	
+	// [START trace_setup_java_custom_span]
+  	private static final Tracer tracer = Tracing.getTracer();
+	
+	
 
 	// filter reference so we can get class names and things like that.
 	@Autowired
@@ -90,5 +108,77 @@ public class HomeController {
 	public String login(Principal p) {
 		return "login";
 	}
+	
+	
+	
+	
+	public static void doWork() {
+    	// Create a child Span of the current Span.
+    		try (Scope ss = tracer.spanBuilder("MyChildWorkSpan").startScopedSpan()) {
+      			doInitialWork();
+      			tracer.getCurrentSpan().addAnnotation("Finished initial work");
+      			doFinalWork();
+    		}
+  	}
+
+  	private static void doInitialWork() {
+    	// ...
+    		tracer.getCurrentSpan().addAnnotation("Doing initial work");
+    	// ...
+  	}
+
+  	private static void doFinalWork() {
+    	// ...
+    		tracer.getCurrentSpan().addAnnotation("Hello world!");
+    	// ...
+  	}
+  	// [END trace_setup_java_custom_span]
+	
+	
+	
+	
+	// [START trace_setup_java_full_sampling]
+  	public static void doWorkFullSampled() {
+    		try (Scope ss =
+       			tracer
+            			.spanBuilder("MyChildWorkSpan")
+            			.setSampler(Samplers.alwaysSample())
+            			.startScopedSpan()) {
+      			doInitialWork();
+      			tracer.getCurrentSpan().addAnnotation("Finished initial work");
+      			doFinalWork();
+    		}
+  	}
+  	// [END trace_setup_java_full_sampling]
+
+  	// [START trace_setup_java_create_and_register]
+  	public static void createAndRegister() throws IOException {
+    		StackdriverTraceExporter.createAndRegister(StackdriverTraceConfiguration.builder().build());
+  	}
+  	// [END trace_setup_java_create_and_register]
+
+  	// [START trace_setup_java_create_and_register_with_token]
+  	public static void createAndRegisterWithToken(String accessToken) throws IOException {
+    		Date expirationTime = DateTime.now().plusSeconds(60).toDate();
+
+    		GoogleCredentials credentials =
+        		GoogleCredentials.create(new AccessToken(accessToken, expirationTime));
+    		StackdriverTraceExporter.createAndRegister(
+        		StackdriverTraceConfiguration.builder()
+            			.setProjectId("MyStackdriverProjectId")
+            			.setCredentials(credentials)
+           	 		.build());
+  	}
+  	// [END trace_setup_java_create_and_register_with_token]
+
+  	// [START trace_setup_java_register_exporter]
+  	public static void createAndRegisterGoogleCloudPlatform(String projectId) throws IOException {
+    		StackdriverTraceExporter.createAndRegister(
+        		StackdriverTraceConfiguration.builder().setProjectId(projectId).build());
+  	}
+  	// [END trace_setup_java_register_exporter]
+	
+	
+	
 
 }
